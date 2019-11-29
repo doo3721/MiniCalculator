@@ -19,6 +19,6 @@
  * 연산식에 Power(^) 추가
  * 주석 코멘트 무시(/*)
  * 프로젝트를 바탕으로 한 간단한 인터프린터 제작
-  * program, var, begin, end 등의 명령어 추가
-  * 변수할당은 선언된 변수만 가능
-  * Symbol table 구성(변수명, 타입, 값)
+   * program, var, begin, end 등의 명령어 추가
+   * 변수할당은 선언된 변수만 가능
+   * Symbol table 구성(변수명, 타입, 값)
