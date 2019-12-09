@@ -10,7 +10,7 @@ using namespace std;
 enum TknKind				/* 토큰의 종류 */
 {
 	Print, Lparen, Rparen, Plus, Minus, Multi, Divi,
-	Assign, VarName, IntNum, EofTkn, Others
+	Assign, VarName, IntNum, EofTkn, Others, Power, Comment
 };
 
 struct Token
@@ -27,9 +27,11 @@ void statement();
 void expression();
 void term();
 void factor();
+void power();
 Token nextTkn();
 int nextCh();
 void operate(TknKind op);
+void powerOperate(int d1, int d2);
 void push(int n);
 int pop();
 void chkTkn(TknKind kd);
@@ -83,13 +85,18 @@ void statement()								// 대입/출력문
 		chkTkn(EofTkn); if (errF) break;
 		cout << " " << pop() << endl;
 		return;
+	case Comment:								// 주석문
+		ch = nextCh();
+		for (; ch != '\0'; ch = nextCh()) {}
+		token = nextTkn();
+		break;
 	default:
 		errF = 1;
 	}
 	chkTkn(EofTkn);								// 행 끝 검사
 }
 
-void expression()
+void expression()								// 식
 {
 	TknKind op;
 
@@ -100,13 +107,28 @@ void expression()
 		term();
 		operate(op);
 	}
+	if (token.kind == Comment) factor();		// 중간 주석
 }
 
-void term()
+void term()										// 항
 {
 	TknKind op;
-	factor();
+
+	power();
 	while (token.kind == Multi || token.kind == Divi) {
+		op = token.kind;
+		token = nextTkn();
+		power();
+		operate(op);
+	}
+}
+
+void power()									// 거듭제곱
+{
+	TknKind op;
+
+	factor();
+	while (token.kind == Power) {
 		op = token.kind;
 		token = nextTkn();
 		factor();
@@ -114,20 +136,24 @@ void term()
 	}
 }
 
-void factor()
+void factor()									// 인자
 {
 	switch (token.kind)
 	{
-	case VarName:
+	case VarName:								// 변수
 		push(var[token.intVal]);
 		break;
-	case IntNum:
+	case IntNum:								// 정수 상수
 		push(token.intVal);
 		break;
-	case Lparen:
+	case Lparen:								// (식)
 		token = nextTkn();
 		expression();
-		chkTkn(Rparen);
+		chkTkn(Rparen);							// ')'일 것
+		break;
+	case Comment:								// 중간 주석 처리
+		ch = nextCh();
+		for (; ch != '\0'; ch = nextCh()) {}
 		break;
 	default:
 		errF = 1;
@@ -135,20 +161,20 @@ void factor()
 	token = nextTkn();
 }
 
-Token nextTkn()
+Token nextTkn()									// 다음 토큰
 {
 	TknKind kd = Others;
 	int num;
 
-	while (isspace(ch))
+	while (isspace(ch))							// 공백 건너뛰기
 		ch = nextCh();
-	if (isdigit(ch)) {
+	if (isdigit(ch)) {							// 숫자
 		for (num = 0; isdigit(ch); ch = nextCh())
 			num = num * 10 + (ch - '0');
 		return Token(IntNum, num);
 	}
-	else if (islower(ch)) {
-		num = ch - 'a';
+	else if (islower(ch)) {						// 변수
+		num = ch - 'a';							// 변수 번호 0-25
 		ch = nextCh();
 		return Token(VarName, num);
 	}
@@ -160,23 +186,35 @@ Token nextTkn()
 		case '+': kd = Plus; break;
 		case '-': kd = Minus; break;
 		case '*': kd = Multi; break;
-		case '/': kd = Divi; break;
+		case '/': 
+			ch = nextCh();
+			if (ch == '/')
+			{
+				kd = Comment;
+				return Token(kd);
+			}
+			else
+			{
+				kd = Divi;
+				return Token(kd);
+			}
 		case '=': kd = Assign; break;
 		case '?': kd = Print; break;
 		case '\0': kd = EofTkn; break;
+		case '^': kd = Power; break;
 		}
 		ch = nextCh();
 		return Token(kd);
 	}
 }
 
-int nextCh()
+int nextCh()									// 다음 1 문자
 {
 	if (*bufp == '\0') return '\0';
 	else return *bufp++;
 }
 
-void operate(TknKind op)
+void operate(TknKind op)						// 연산 실행
 {
 	int d2 = pop(), d1 = pop();
 	
@@ -188,24 +226,32 @@ void operate(TknKind op)
 	case Minus: push(d1 - d2); break;
 	case Multi: push(d1 * d2); break;
 	case Divi: push(d1 / d2); break;
+	case Power: powerOperate(d1, d2); break;
 	}
 }
 
-void push(int n)
+void powerOperate(int d1, int d2)				// 거듭제곱 계산
+{
+	int n = 1;
+	for (int i = 0; i < d2; i++) { n *= d1; }
+	push(n);
+}
+
+void push(int n)								// 스택 저장
 {
 	if (errF) return;
 	if (stkct + 1 > STK_SIZ) { cout << "stack overflow\n"; exit(1); }
 	stack[++stkct] = n;
 }
 
-int pop()
+int pop()										// 스택 추출
 {
-	if (errF) return 1;
+	if (errF) return 1;							// 오류 시는 단순히 1을 반환한다
 	if (stkct < 1) { cout << "stack underflow\n"; exit(1); }
 	return stack[stkct--];
 }
 
-void chkTkn(TknKind kd)
+void chkTkn(TknKind kd)							// 모든 종류 확인
 {
-	if (token.kind != kd) errF = 1;
+	if (token.kind != kd) errF = 1;				// 불일치
 }
