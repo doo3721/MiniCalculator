@@ -1,5 +1,17 @@
-// MiniCalc.cpp : 콘솔 응용 프로그램에 대한 진입점을 정의합니다.
-//
+/*
+ * modified by kim doohee on 2019.12.11
+ *
+ * 본 프로그램은 "만들면서 배우는 인터프린터"에 있는
+ * 전자 계산기 프로그램을 참고하였습니다.
+ *
+ * 프로그램 사용법
+ * 대입문: "a=10", "b=20", "c=a+b" 등의 식을 사용
+ * 출력문: "? a", "? a+b" 등의 식을 사용
+ * 주석: "//"으로 사용, 일반적인 Line Comment와 같이 적용
+ * 연산자: +,-,*,/,^,(,) 가 존재
+ * 띄어쓰기는 상관 없음
+ *
+ */
 
 #include "stdafx.h"
 #include <iostream>
@@ -35,12 +47,14 @@ void powerOperate(int d1, int d2);
 void push(int n);
 int pop();
 void chkTkn(TknKind kd);
+bool exceptComment();
 
 
 int stack[STK_SIZ + 1];		// 스택
 int stkct;					// 스택 관리
 Token token;				// 토큰 저장
-char buf[80], *bufp;		// 입력용
+char buf[80];				// 입력용
+int idx;					// 문자 위치
 int ch;						// 가져온 문자를 저장
 int var[26];				// 변수 a-z
 int errF;					// 오류 발생
@@ -61,7 +75,7 @@ void input()
 {
 	errF = 0; stkct = 0;						// 초기 설정
 	cin.getline(buf, 80);						// 80문자 이내의 입력
-	bufp = buf;									// 시작 문자 위치
+	idx = 0;									// 시작 문자 위치
 	ch = nextCh();								// 초기 문자 가져오기
 }
 
@@ -85,11 +99,8 @@ void statement()								// 대입/출력문
 		chkTkn(EofTkn); if (errF) break;
 		cout << " " << pop() << endl;
 		return;
-	case Comment:								// 주석문
-		ch = nextCh();
-		for (; ch != '\0'; ch = nextCh()) {}
-		token = nextTkn();
-		break;
+	case Comment:								// 주석
+		return;
 	default:
 		errF = 1;
 	}
@@ -107,7 +118,6 @@ void expression()								// 식
 		term();
 		operate(op);
 	}
-	if (token.kind == Comment) factor();		// 중간 주석
 }
 
 void term()										// 항
@@ -151,10 +161,6 @@ void factor()									// 인자
 		expression();
 		chkTkn(Rparen);							// ')'일 것
 		break;
-	case Comment:								// 중간 주석 처리
-		ch = nextCh();
-		for (; ch != '\0'; ch = nextCh()) {}
-		break;
 	default:
 		errF = 1;
 	}
@@ -165,6 +171,11 @@ Token nextTkn()									// 다음 토큰
 {
 	TknKind kd = Others;
 	int num;
+
+	if (exceptComment())						// 주석을 처음부터 쓸 경우, Comment 토큰을 반환
+	{
+		return Token(Comment, 0);
+	}
 
 	while (isspace(ch))							// 공백 건너뛰기
 		ch = nextCh();
@@ -186,18 +197,7 @@ Token nextTkn()									// 다음 토큰
 		case '+': kd = Plus; break;
 		case '-': kd = Minus; break;
 		case '*': kd = Multi; break;
-		case '/': 
-			ch = nextCh();
-			if (ch == '/')
-			{
-				kd = Comment;
-				return Token(kd);
-			}
-			else
-			{
-				kd = Divi;
-				return Token(kd);
-			}
+		case '/': kd = Divi; break;
 		case '=': kd = Assign; break;
 		case '?': kd = Print; break;
 		case '\0': kd = EofTkn; break;
@@ -210,8 +210,8 @@ Token nextTkn()									// 다음 토큰
 
 int nextCh()									// 다음 1 문자
 {
-	if (*bufp == '\0') return '\0';
-	else return *bufp++;
+	if (buf[idx] == '\0') return '\0';
+	else return buf[idx++];
 }
 
 void operate(TknKind op)						// 연산 실행
@@ -254,4 +254,23 @@ int pop()										// 스택 추출
 void chkTkn(TknKind kd)							// 모든 종류 확인
 {
 	if (token.kind != kd) errF = 1;				// 불일치
+}
+
+bool exceptComment()							// 주석처리
+{
+	bool result = false;
+
+	while (ch != '\0' && isspace(ch)) ch = nextCh();
+	if (ch == '\0') return result;
+
+	if (ch == '/')
+	{
+		if (buf[idx] == '/')
+		{
+			if (idx == 1) result = true;		// 주석을 처음부터 쓸 경우
+			while (ch != '\0') ch = nextCh();
+		}
+	}
+
+	return result;
 }
